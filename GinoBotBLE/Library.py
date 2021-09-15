@@ -6,11 +6,9 @@ from time import sleep
 
 
 async def run():
+
     await gb.scan()
-    # while True:
-    #     await gb.move_forward(Speed.Fast)
-    #await gb.move_backwards()
-    await gb.Back_Lights()
+    #await gb.Front_Lights(color.red, 0 ,0)
 
 
 loop = asyncio.get_event_loop()

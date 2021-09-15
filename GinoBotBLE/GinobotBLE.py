@@ -12,21 +12,34 @@ from bleak import discover
 # from aioconsole import ainput
 
 class speed(Enum):
-    Fast = 100
-    Medium = 80
-    Slow = 60
+
+    @staticmethod
+    def value(**kwargs):
+        Fast = 100
+        Medium = 80
+        Slow = 60
 
 
 class color(Enum):
-    red = 255
-    green = 255
-    blue = 255
+
+    @staticmethod
+    def value(**kwargs):
+        red = 255
+        green = 255
+        blue = 255
 
 
 read_characteristic = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
 write_characteristic = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
 
+devices_list = []
+devices_add = []
 device_count = 0
+Found = False
+InputsYes = ['Y', 'yes' , 'YES', 'y', 'Yes']
+InputsNo = ['n', 'N' , 'No' , 'NO', 'no']
+# InputY = False
+# InputN = False
 Firmware = 0
 Hardware = 0
 
@@ -50,28 +63,70 @@ def search():
 
 
 async def scan():
-    # Error message
-    # await client.write_gatt_char(write_characteristic, who_msg)
-    # NameError: name
-    # 'client' is not defined
     global devices
-    global client
+    global InputN
+    global InputY
+    global device_count
+    device_count = 0
+    InputY = False
+    InputN = False
     search()
     devices = await discover()
     for i, device in enumerate(devices):
-
         if device.name == 'ESP32':
-            print("Device found do you with to connect? [y/n]")
-            if (input() == 'y'):
-                client = BleakClient(device.address)
-                await client.connect()
-                device_address = client.address
-                if (client.is_connected):
-                    print("Connection was successful")
-                    await who_func()
-                    return True
+            devices_list.append(device.name + " " + device.address)
+            devices_add.append(device.address)
+            device_count += 1
+    if device_count == 0:
+        print('No devices found')
+        ins = input("Do you want to rescan? [y/n]")
+        if(ins in InputsYes or InputY):
+            await scan()
+
+        elif (ins in InputsNo or InputN):
+            print("Exiting")
+            quit()
+        else:
+            ins = input("Invalid Input Enter again:")
+            while ins not in InputsYes or ins not in InputsNo:
+                ins = input("Invalid input Enter again")
+                if (ins in InputsYes):
+                    InputY = True
+                    await scan()
+                    break
+                elif(ins in InputsNo):
+                    InputN = True
+                    break
                 else:
-                    return False
+                    continue
+
+    if device_count == 1:
+        print(device_count, "Device found ")
+        print('\n'.join(devices_list))
+        print("Choose a device to connect")
+        await connect()
+        Found = True
+
+    elif device_count > 1:
+        print(device_count, "Devices found ")
+        print('\n'.join(devices_list))
+        print("Choose a device to connect")
+        await connect()
+        Found = True
+
+
+async def connect():
+    global client
+    client = BleakClient(devices_add[(int(input()) - 1)])
+    try:
+        await client.connect()
+        device_add = client.address
+        if client.is_connected:
+            print("Connection was successful")
+            await who_func()
+            return True
+    except Exception as e:
+        print("Device failed to connect")
 
 
 async def who_func():
@@ -80,11 +135,16 @@ async def who_func():
     global Firmware
     global Hardware
     if BleakClient.is_connected:
-        await client.write_gatt_char(write_characteristic, who_msg)
-        time.sleep(0.3)
-        who_im_i = await client.read_gatt_char(read_characteristic)
-    Firmware = who_im_i[3]
-    Hardware = who_im_i[4]
+        print(client)
+        try:
+            await client.write_gatt_char(write_characteristic, who_msg)
+            time.sleep(0.3)
+            who_im_i = await client.read_gatt_char(read_characteristic)
+            Firmware = who_im_i[3]
+            Hardware = who_im_i[4]
+        except Exception:
+            print("Device failed to configure")
+
     # Make sure this runs until is confirmed
 
 
@@ -150,7 +210,7 @@ async def Front_Lights(red, green, blue):
     await payload_maker()
 
 
-async def Back_Lights(*argument): # Look for multiple arguments in function
+async def Back_Lights(*argument):  # Look for multiple arguments in function
     print('Back Lights input (Red , Green , Blue)')
     col_arr = []
     await empty_array()
