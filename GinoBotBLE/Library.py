@@ -9,6 +9,7 @@ async def run():
 
     await gb.scan()
     #await gb.Front_Lights(color.red, 0 ,0)
+    await gb.controller()
 
 
 loop = asyncio.get_event_loop()

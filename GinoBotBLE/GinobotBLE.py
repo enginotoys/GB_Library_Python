@@ -1,6 +1,6 @@
 import sys
 import asyncio
-import time
+from time import sleep
 import keyboard
 import ast
 from enum import Enum
@@ -11,22 +11,24 @@ from bleak import discover
 
 # from aioconsole import ainput
 
+
 class speed(Enum):
-
-    @staticmethod
-    def value(**kwargs):
-        Fast = 100
-        Medium = 80
-        Slow = 60
+    Fast = 100
+    Medium = 80
+    Slow = 60
 
 
-class color(Enum):
-
-    @staticmethod
-    def value(**kwargs):
-        red = 255
-        green = 255
-        blue = 255
+class color():
+    red = 255
+    green = 255
+    blue = 255
+    RED = [255, 0, 0]
+    GREEN = [0, 255, 0]
+    BLUE = [0, 0, 255]
+    PURPLE = [128, 0, 128]
+    PINK = [255, 0, 255]
+    ORANGE = [255, 165, 0]
+    YELLOW = [255, 255, 0]
 
 
 read_characteristic = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
@@ -36,16 +38,20 @@ devices_list = []
 devices_add = []
 device_count = 0
 Found = False
-InputsYes = ['Y', 'yes' , 'YES', 'y', 'Yes']
-InputsNo = ['n', 'N' , 'No' , 'NO', 'no']
-# InputY = False
-# InputN = False
+InputsYes = ['Y', 'yes', 'YES', 'y', 'Yes']
+InputsNo = ['n', 'N', 'No', 'NO', 'no']
 Firmware = 0
 Hardware = 0
 
 connected = False
 payload_write = 35
 array_struct = []
+
+array_struct_mf = []
+array_struct_mb = []
+array_struct_mr = []
+array_struct_ml = []
+array_struct_empty = []
 
 
 def search():
@@ -80,21 +86,21 @@ async def scan():
     if device_count == 0:
         print('No devices found')
         ins = input("Do you want to rescan? [y/n]")
-        if(ins in InputsYes or InputY):
+        if ins in InputsYes or ins in InputY:
             await scan()
 
-        elif (ins in InputsNo or InputN):
+        elif ins in InputsNo or ins in InputN:
             print("Exiting")
             quit()
         else:
             ins = input("Invalid Input Enter again:")
             while ins not in InputsYes or ins not in InputsNo:
                 ins = input("Invalid input Enter again")
-                if (ins in InputsYes):
+                if ins in InputsYes:
                     InputY = True
                     await scan()
                     break
-                elif(ins in InputsNo):
+                elif ins in InputsNo:
                     InputN = True
                     break
                 else:
@@ -117,7 +123,17 @@ async def scan():
 
 async def connect():
     global client
-    client = BleakClient(devices_add[(int(input()) - 1)])
+    while True:
+        try:
+            var = int(input())
+            if var > device_count:
+                print("Invalid input")
+            else:
+                break
+        except Exception:
+            print("Invalid input")
+
+    client = BleakClient(devices_add[var - 1])
     try:
         await client.connect()
         device_add = client.address
@@ -138,19 +154,15 @@ async def who_func():
         print(client)
         try:
             await client.write_gatt_char(write_characteristic, who_msg)
-            time.sleep(0.3)
+            sleep(0.3)
             who_im_i = await client.read_gatt_char(read_characteristic)
             Firmware = who_im_i[3]
             Hardware = who_im_i[4]
-        except Exception:
+        except Exception:  # Exception is only caused by NameError or Index out of range
             print("Device failed to configure")
-
-    # Make sure this runs until is confirmed
 
 
 async def empty_array():  # This function builds the start empty array for Ginobot
-    # Bug! When a scan fails , the array build function still runs, which means the who func in the array build will fail
-    # Make sure that the exception is in a while Loop that ensures connection and gets Firm , and Hardware version
 
     array_struct.append(hex(ord('W')))
     array_struct.append(hex(ord(':')))
@@ -196,68 +208,276 @@ async def payload_maker():
         array_struct[i] = int(str(array_struct[i]), base=16)
 
     await client.write_gatt_char(write_characteristic, bytes(array_struct))
-    print(array_struct)
-    print('Here')
     array_struct.clear()
 
 
-async def Front_Lights(red, green, blue):
+async def payload_mf():
+    array_struct_mf.append(hex(ord('W')))
+    array_struct_mf.append(hex(ord(':')))
+
+    array_struct_mf.append(hex(ord('0'))), array_struct_mf.append(hex(ord('0'))), array_struct_mf.append(hex(ord('8')))
+    array_struct_mf.append(hex(ord('0'))), array_struct_mf.append(hex(ord('\n')))
+
+    for i in range(7, 32):
+        array_struct_mf.append(hex(ord(' ')))
+
+    array_struct_mf.append(hex(ord('[')))
+    array_struct_mf.append(hex(ord('[')))
+    array_struct_mf.append(hex(ord('[')))
+
+    array_struct_mf.append(Firmware)  # pos 35
+    array_struct_mf.append(Hardware)  # pos 36
+
+    array_struct_mf.append(hex(int(payload_write & 0x00FF)))
+    array_struct_mf.append(hex(int(payload_write & 0xFF00) >> 8))
+
+    array_struct_mf.append(hex(ord('W')))
+    array_struct_mf.append(hex(0))  # pos 40
+
+    for i in range(36):
+        array_struct_mf.append(hex(0))
+    checksum = 0
+    array_struct_mf[57] = '0x44'
+    array_struct_mf[58] = (hex(0 & 0x00FF))
+    array_struct_mf[59] = (hex((0 & 0xFF00) >> 8))
+    array_struct_mf[60] = (hex(100 & 0xff00 >> 8))
+
+    array_struct_mf[61] = (hex(0 & 0x00FF))
+    array_struct_mf[62] = (hex((0 & 0xFF00) >> 8))
+    array_struct_mf[63] = (hex(100 & 0xff00 >> 8))
+    for i in range(payload_write):
+        checksum += int(array_struct_mf[i + 40], 16)
+
+    array_struct_mf.append(hex(int(checksum) & 0x000000FF))
+    array_struct_mf.append(hex((int(checksum) & 0x0000FF00) >> 8))
+
+    array_struct_mf.append(hex(ord(']')))
+    array_struct_mf.append(hex(ord(']')))
+    array_struct_mf.append(hex(ord(']')))
+
+    print(array_struct_mf)
+    for i in range(len(array_struct_mf)):
+        array_struct_mf[i] = int(str(array_struct_mf[i]), base=16)
+
+
+async def payload_mb():
+    array_struct_mb.append(hex(ord('W')))
+    array_struct_mb.append(hex(ord(':')))
+
+    array_struct_mb.append(hex(ord('0'))), array_struct_mb.append(hex(ord('0'))), array_struct_mb.append(hex(ord('8')))
+    array_struct_mb.append(hex(ord('0'))), array_struct_mb.append(hex(ord('\n')))
+
+    for i in range(7, 32):
+        array_struct_mb.append(hex(ord(' ')))
+
+    array_struct_mb.append(hex(ord('[')))
+    array_struct_mb.append(hex(ord('[')))
+    array_struct_mb.append(hex(ord('[')))
+
+    array_struct_mb.append(Firmware)  # pos 35
+    array_struct_mb.append(Hardware)  # pos 36
+
+    array_struct_mb.append(hex(int(payload_write & 0x00FF)))
+    array_struct_mb.append(hex(int(payload_write & 0xFF00) >> 8))
+
+    array_struct_mb.append(hex(ord('W')))
+    array_struct_mb.append(hex(0))  # pos 40
+
+    for i in range(36):
+        array_struct_mb.append(hex(0))
+    checksum = 0
+    array_struct_mb[57] = '0x44'
+    array_struct_mb[58] = (hex(0 & 0x00FF))
+    array_struct_mb[59] = (hex((0 & 0xFF00) >> 8))
+    array_struct_mb[60] = (hex(-100 & 0xff00 >> 8))
+
+    array_struct_mb[61] = (hex(0 & 0x00FF))
+    array_struct_mb[62] = (hex((0 & 0xFF00) >> 8))
+    array_struct_mb[63] = (hex(-100 & 0xff00 >> 8))
+    for i in range(payload_write):
+        checksum += int(array_struct_mb[i + 40], 16)
+
+    array_struct_mb.append(hex(int(checksum) & 0x000000FF))
+    array_struct_mb.append(hex((int(checksum) & 0x0000FF00) >> 8))
+
+    array_struct_mb.append(hex(ord(']')))
+    array_struct_mb.append(hex(ord(']')))
+    array_struct_mb.append(hex(ord(']')))
+
+    print(array_struct_mb)
+    for i in range(len(array_struct_mb)):
+        array_struct_mb[i] = int(str(array_struct_mb[i]), base=16)
+
+
+async def payload_mr():
+    array_struct_mr.append(hex(ord('W')))
+    array_struct_mr.append(hex(ord(':')))
+
+    array_struct_mr.append(hex(ord('0'))), array_struct_mr.append(hex(ord('0'))), array_struct_mr.append(hex(ord('8')))
+    array_struct_mr.append(hex(ord('0'))), array_struct_mr.append(hex(ord('\n')))
+
+    for i in range(7, 32):
+        array_struct_mr.append(hex(ord(' ')))
+
+    array_struct_mr.append(hex(ord('[')))
+    array_struct_mr.append(hex(ord('[')))
+    array_struct_mr.append(hex(ord('[')))
+
+    array_struct_mr.append(Firmware)  # pos 35
+    array_struct_mr.append(Hardware)  # pos 36
+
+    array_struct_mr.append(hex(int(payload_write & 0x00FF)))
+    array_struct_mr.append(hex(int(payload_write & 0xFF00) >> 8))
+
+    array_struct_mr.append(hex(ord('W')))
+    array_struct_mr.append(hex(0))  # pos 40
+
+    for i in range(36):
+        array_struct_mr.append(hex(0))
+    checksum = 0
+    array_struct_mr[57] = '0x44'
+    array_struct_mr[58] = (hex(0 & 0x00FF))
+    array_struct_mr[59] = (hex((0 & 0xFF00) >> 8))
+    array_struct_mr[60] = (hex(100 & 0xff00 >> 8))
+
+    array_struct_mr[61] = (hex(0 & 0x00FF))
+    array_struct_mr[62] = (hex((0 & 0xFF00) >> 8))
+    array_struct_mr[63] = (hex(-100 & 0xff00 >> 8))
+    for i in range(payload_write):
+        checksum += int(array_struct_mr[i + 40], 16)
+
+    array_struct_mr.append(hex(int(checksum) & 0x000000FF))
+    array_struct_mr.append(hex((int(checksum) & 0x0000FF00) >> 8))
+
+    array_struct_mr.append(hex(ord(']')))
+    array_struct_mr.append(hex(ord(']')))
+    array_struct_mr.append(hex(ord(']')))
+
+    print(array_struct_mr)
+    for i in range(len(array_struct_mr)):
+        array_struct_mr[i] = int(str(array_struct_mr[i]), base=16)
+
+
+async def payload_ml():
+    array_struct_ml.append(hex(ord('W')))
+    array_struct_ml.append(hex(ord(':')))
+
+    array_struct_ml.append(hex(ord('0'))), array_struct_ml.append(hex(ord('0'))), array_struct_ml.append(hex(ord('8')))
+    array_struct_ml.append(hex(ord('0'))), array_struct_ml.append(hex(ord('\n')))
+
+    for i in range(7, 32):
+        array_struct_ml.append(hex(ord(' ')))
+
+    array_struct_ml.append(hex(ord('[')))
+    array_struct_ml.append(hex(ord('[')))
+    array_struct_ml.append(hex(ord('[')))
+
+    array_struct_ml.append(Firmware)  # pos 35
+    array_struct_ml.append(Hardware)  # pos 36
+
+    array_struct_ml.append(hex(int(payload_write & 0x00FF)))
+    array_struct_ml.append(hex(int(payload_write & 0xFF00) >> 8))
+
+    array_struct_ml.append(hex(ord('W')))
+    array_struct_ml.append(hex(0))  # pos 40
+
+    for i in range(36):
+        array_struct_ml.append(hex(0))
+    checksum = 0
+    array_struct_ml[57] = '0x44'
+    array_struct_ml[58] = (hex(0 & 0x00FF))
+    array_struct_ml[59] = (hex((0 & 0xFF00) >> 8))
+    array_struct_ml[60] = (hex(-100 & 0xff00 >> 8))
+
+    array_struct_ml[61] = (hex(0 & 0x00FF))
+    array_struct_ml[62] = (hex((0 & 0xFF00) >> 8))
+    array_struct_ml[63] = (hex(100 & 0xff00 >> 8))
+    for i in range(payload_write):
+        checksum += int(array_struct_ml[i + 40], 16)
+
+    array_struct_ml.append(hex(int(checksum) & 0x000000FF))
+    array_struct_ml.append(hex((int(checksum) & 0x0000FF00) >> 8))
+
+    array_struct_ml.append(hex(ord(']')))
+    array_struct_ml.append(hex(ord(']')))
+    array_struct_ml.append(hex(ord(']')))
+
+    print(array_struct_ml)
+    for i in range(len(array_struct_ml)):
+        array_struct_ml[i] = int(str(array_struct_ml[i]), base=16)
+
+async def payload_empty():
+    array_struct_empty.append(hex(ord('W')))
+    array_struct_empty.append(hex(ord(':')))
+
+    array_struct_empty.append(hex(ord('0'))), array_struct_empty.append(hex(ord('0'))), array_struct_empty.append(hex(ord('8')))
+    array_struct_empty.append(hex(ord('0'))), array_struct_empty.append(hex(ord('\n')))
+
+    for i in range(7, 32):
+        array_struct_empty.append(hex(ord(' ')))
+
+    array_struct_empty.append(hex(ord('[')))
+    array_struct_empty.append(hex(ord('[')))
+    array_struct_empty.append(hex(ord('[')))
+
+    array_struct_empty.append(Firmware)  # pos 35
+    array_struct_empty.append(Hardware)  # pos 36
+
+    array_struct_empty.append(hex(int(payload_write & 0x00FF)))
+    array_struct_empty.append(hex(int(payload_write & 0xFF00) >> 8))
+
+    array_struct_empty.append(hex(ord('W')))
+    array_struct_empty.append(hex(0))  # pos 40
+
+    for i in range(36):
+        array_struct_empty.append(hex(0))
+    checksum = 0
+    for i in range(payload_write):
+        checksum += int(array_struct_empty[i + 40], 16)
+
+    array_struct_empty.append(hex(int(checksum) & 0x000000FF))
+    array_struct_empty.append(hex((int(checksum) & 0x0000FF00) >> 8))
+
+    array_struct_empty.append(hex(ord(']')))
+    array_struct_empty.append(hex(ord(']')))
+    array_struct_empty.append(hex(ord(']')))
+
+    print(array_struct_empty)
+    for i in range(len(array_struct_empty)):
+        array_struct_empty[i] = int(str(array_struct_empty[i]), base=16)
+
+
+####################### Functionality ##########################
+
+async def Front_Lights(red=None, green=0, blue=0):
     print("Front Lights input (Red , Green , Blue)")
     await empty_array()
-    array_struct[49] = hex(red)
-    array_struct[50] = hex(green)
-    array_struct[51] = hex(blue)
-    await payload_maker()
 
-
-async def Back_Lights(*argument):  # Look for multiple arguments in function
-    print('Back Lights input (Red , Green , Blue)')
-    col_arr = []
-    await empty_array()
-    col_arr.append(0)
-    col_arr.append(0)
-    col_arr.append(0)
-
-    for count, i in enumerate(argument):
-        col_arr[count] = i
-        print(i)
-    array_struct[46] = hex(col_arr[0])
-    array_struct[47] = hex(col_arr[1])
-    array_struct[48] = hex(col_arr[2])
+    if isinstance(red, list):
+        array_struct[49] = hex(red[0])
+        array_struct[50] = hex(red[1])
+        array_struct[51] = hex(red[2])
+    else:
+        array_struct[49] = hex(red)
+        array_struct[50] = hex(green)
+        array_struct[51] = hex(blue)
 
     await payload_maker()
 
 
-async def Front_Lights2(red, green, blue):
+async def Back_Lights(red=None, green=0, blue=0):
     print("Front Lights input (Red , Green , Blue)")
     await empty_array()
-    print("Red=", end=" ")
-    red = int(input())
-    print("Green=", end=" ")
-    green = int(input())
-    print("Blue=", end=" ")
-    blue = int(input())
-    array_struct[49] = hex(red)
-    array_struct[50] = hex(green)
-    array_struct[51] = hex(blue)
-    await payload_maker()
 
+    if isinstance(red, list):
+        array_struct[46] = hex(red[0])
+        array_struct[47] = hex(red[1])
+        array_struct[48] = hex(red[2])
+    else:
+        array_struct[46] = hex(red)
+        array_struct[47] = hex(green)
+        array_struct[48] = hex(blue)
 
-async def Back_Lights2():
-    print('Back Lights input (Red , Green , Blue)')
-
-    print("Red=", end=" ")
-    red = int(input())
-    print("Green=", end=" ")
-    green = int(input())
-    print("Blue=", end=" ")
-    blue = int(input())
-    await empty_array()  # This probably shouldnt be here
-    # array_struct[36] = Firmware
-    # array_struct[37] = Hardware
-    array_struct[46] = hex(red)
-    array_struct[47] = hex(green)
-    array_struct[48] = hex(blue)
     await payload_maker()
 
 
@@ -325,7 +545,21 @@ async def move_left(speed):
     await payload_maker()
 
 
+async def stop():
+    await empty_array()
+    array_struct[57] = '0x44'
+    array_struct[58] = (hex(0 & 0x00FF))
+    array_struct[59] = (hex((0 & 0xFF00) >> 8))
+    array_struct[60] = (hex(0 & 0xff00 >> 8))
+
+    array_struct[61] = (hex(0 & 0x00FF))
+    array_struct[62] = (hex((0 & 0xFF00) >> 8))
+    array_struct[63] = (hex(0 & 0xff00 >> 8))
+    await payload_maker()
+
+
 ########################## TESTS #############################
+
 async def Buzzer2():
     # 53 , 54
     print("Enter buzzer frequancy")
@@ -335,6 +569,24 @@ async def Buzzer2():
     array_struct[54] = (hex((int(freq) & 0x0000FF00) >> 8))  # Wrong bit shifting seems to work
     print(array_struct[53])
     print((array_struct[54]))
+    await payload_maker()
+
+
+async def Back_Lights_Test(*args):  # Look for multiple arguments in function
+    print('Back Lights input (Red , Green , Blue)')
+    col_arr = []
+    await empty_array()
+    col_arr.append(0)
+    col_arr.append(0)
+    col_arr.append(0)
+
+    for count, i in enumerate(args):
+        col_arr[count] = i
+        print(i)
+    array_struct[46] = hex(col_arr[0])
+    array_struct[47] = hex(col_arr[1])
+    array_struct[48] = hex(col_arr[2])
+
     await payload_maker()
 
 
@@ -352,7 +604,7 @@ async def move_forward2():
     array_struct[63] = (hex(speed & 0xff00 >> 8))
     await payload_maker()
     await empty_array()
-    time.sleep(0.1)
+    sleep(0.15)
     array_struct[57] = '0x44'
     array_struct[58] = (hex(0 & 0x00FF))
     array_struct[59] = (hex((0 & 0xFF00) >> 8))
@@ -364,13 +616,55 @@ async def move_forward2():
     await payload_maker()
 
 
-async def move_forward3():
-    await move_forward(100)
-    await client.write_gatt_char(write_characteristic, bytes(array_struct))
-    array_struct.clear()
+async def move_backwards2():
+    await empty_array()
+    array_struct[57] = '0x44'
+    array_struct[58] = (hex(0 & 0x00FF))
+    array_struct[59] = (hex((0 & 0xFF00) >> 8))
+    array_struct[60] = (hex(-100 & 0xff00 >> 8))
+
+    array_struct[61] = (hex(0 & 0x00FF))
+    array_struct[62] = (hex((0 & 0xFF00) >> 8))
+    array_struct[63] = (hex(-100 & 0xff00 >> 8))
+    await payload_maker()
+    await empty_array()
+    sleep(0.15)
+    array_struct[57] = '0x44'
+    array_struct[58] = (hex(0 & 0x00FF))
+    array_struct[59] = (hex((0 & 0xFF00) >> 8))
+    array_struct[60] = (hex(0 & 0xff00 >> 8))
+
+    array_struct[61] = (hex(0 & 0x00FF))
+    array_struct[62] = (hex((0 & 0xFF00) >> 8))
+    array_struct[63] = (hex(0 & 0xff00 >> 8))
+    await payload_maker()
 
 
-async def stop():
+async def move_right2():
+    await empty_array()
+    array_struct[57] = '0x44'
+    array_struct[58] = (hex(0 & 0x00FF))
+    array_struct[59] = (hex((0 & 0xFF00) >> 8))
+    array_struct[60] = (hex(100 & 0xff00 >> 8))
+
+    array_struct[61] = (hex(0 & 0x00FF))
+    array_struct[62] = (hex((0 & 0xFF00) >> 8))
+    array_struct[63] = (hex(0 & 0xff00 >> 8))
+    await payload_maker()
+    await empty_array()
+    sleep(0.15)
+    array_struct[57] = '0x44'
+    array_struct[58] = (hex(0 & 0x00FF))
+    array_struct[59] = (hex((0 & 0xFF00) >> 8))
+    array_struct[60] = (hex(0 & 0xff00 >> 8))
+
+    array_struct[61] = (hex(0 & 0x00FF))
+    array_struct[62] = (hex((0 & 0xFF00) >> 8))
+    array_struct[63] = (hex(0 & 0xff00 >> 8))
+    await payload_maker()
+
+
+async def move_left2():
     await empty_array()
     array_struct[57] = '0x44'
     array_struct[58] = (hex(0 & 0x00FF))
@@ -379,17 +673,112 @@ async def stop():
 
     array_struct[61] = (hex(0 & 0x00FF))
     array_struct[62] = (hex((0 & 0xFF00) >> 8))
+    array_struct[63] = (hex(100 & 0xff00 >> 8))
+    await payload_maker()
+    await empty_array()
+    sleep(0.15)
+    array_struct[57] = '0x44'
+    array_struct[58] = (hex(0 & 0x00FF))
+    array_struct[59] = (hex((0 & 0xFF00) >> 8))
+    array_struct[60] = (hex(0 & 0xff00 >> 8))
+
+    array_struct[61] = (hex(0 & 0x00FF))
+    array_struct[62] = (hex((0 & 0xFF00) >> 8))
     array_struct[63] = (hex(0 & 0xff00 >> 8))
     await payload_maker()
 
-#
-# async def controller():
-#     val = True
-#     while val:
-#         if keyboard.is_pressed('w'):
-#             await move_forward3()
-#         else:
+####################### Controller################################
+async def move_forward3():
+    await client.write_gatt_char(write_characteristic, bytes(array_struct_mf))
+    sleep(0.1)
+    await client.write_gatt_char(write_characteristic, bytes(array_struct_empty))
 
+async def move_backwards3():
+    await client.write_gatt_char(write_characteristic, bytes(array_struct_mb))
+    sleep(0.1)
+    await client.write_gatt_char(write_characteristic, bytes(array_struct_empty))
+
+
+async def move_right3():
+    await client.write_gatt_char(write_characteristic, bytes(array_struct_mr))
+    sleep(0.1)
+    await client.write_gatt_char(write_characteristic, bytes(array_struct_empty))
+
+
+async def move_left3():
+    await client.write_gatt_char(write_characteristic, bytes(array_struct_ml))
+    sleep(0.1)
+    await client.write_gatt_char(write_characteristic, bytes(array_struct_empty))
+
+####################### Controller ######################################
+
+
+
+async def Front_Lights2(red, green, blue):
+    print("Front Lights input (Red , Green , Blue)")
+    await empty_array()
+    print("Red=", end=" ")
+    red = int(input())
+    print("Green=", end=" ")
+    green = int(input())
+    print("Blue=", end=" ")
+    blue = int(input())
+    array_struct[49] = hex(red)
+    array_struct[50] = hex(green)
+    array_struct[51] = hex(blue)
+    await payload_maker()
+
+
+async def Back_Lights2():
+    print('Back Lights input (Red , Green , Blue)')
+
+    print("Red=", end=" ")
+    red = int(input())
+    print("Green=", end=" ")
+    green = int(input())
+    print("Blue=", end=" ")
+    blue = int(input())
+    await empty_array()  # This probably shouldnt be here
+    # array_struct[36] = Firmware
+    # array_struct[37] = Hardware
+    array_struct[46] = hex(red)
+    array_struct[47] = hex(green)
+    array_struct[48] = hex(blue)
+    await payload_maker()
+
+
+async def controller():
+    await payload_mf()
+    await payload_mb()
+    await payload_ml()
+    await payload_mr()
+    await payload_empty()
+    while True:
+        if (a ==b )
+        # while keyboard.is_pressed('w'):
+        #     await move_forward2()
+        # while keyboard.is_pressed('s'):
+        #     await move_backwards2()
+        # while keyboard.is_pressed('a'):
+        #     await move_left2()
+        # while keyboard.is_pressed('d'):
+        #     await move_right2()
+        # if keyboard.is_pressed('w'):
+        #     await move_forward2()
+        # if keyboard.is_pressed('s'):
+        #     await move_backwards2()
+        # if keyboard.is_pressed('a'):
+        #     await move_left2()
+        # if keyboard.is_pressed('d'):
+        #     await move_right2()
+        if keyboard.is_pressed('w'):
+            await move_forward3()
+        if keyboard.is_pressed('s'):
+            await move_backwards3()
+        if keyboard.is_pressed('a'):
+            await move_left3()
+        if keyboard.is_pressed('d'):
+            await move_right3()
 
 # async def live_data():
 #     read = b'R\n'
