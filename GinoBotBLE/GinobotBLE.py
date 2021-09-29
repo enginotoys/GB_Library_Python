@@ -20,13 +20,8 @@ class speed(Enum):
         Slow = 60
 
 
-class color(Enum):
-
-    @staticmethod
-    def value(**kwargs):
-        red = 255
-        green = 255
-        blue = 255
+class color():
+        RED  = [255, 0, 0]
 
 
 read_characteristic = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
@@ -200,13 +195,19 @@ async def payload_maker():
     print('Here')
     array_struct.clear()
 
-
-async def Front_Lights(red, green, blue):
+async def Front_Lights(red=None, green=0, blue=0):
     print("Front Lights input (Red , Green , Blue)")
     await empty_array()
-    array_struct[49] = hex(red)
-    array_struct[50] = hex(green)
-    array_struct[51] = hex(blue)
+
+    if isinstance(red, list):
+        array_struct[49] = hex(red[0])
+        array_struct[50] = hex(red[1])
+        array_struct[51] = hex(red[2])
+    else:
+        array_struct[49] = hex(red)
+        array_struct[50] = hex(green)
+        array_struct[51] = hex(blue)
+
     await payload_maker()
 
 
