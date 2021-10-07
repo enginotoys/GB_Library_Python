@@ -1,22 +1,22 @@
 from os import environ
-environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 from typing import Union
 import sys
 from math import floor
-import asyncio
-import pygame
 from time import sleep
 from bleak import BleakClient
 from bleak import discover
 
+environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
+import pygame
 
-class speed():
+
+class speed:
     fast = 100
     medium = 80
     slow = 70
 
 
-class color():
+class color:
     RED = [255, 0, 0]
     GREEN = [0, 255, 0]
     BLUE = [0, 0, 255]
@@ -26,16 +26,17 @@ class color():
     YELLOW = [255, 255, 0]
 
 
-class frequency():
+class frequency:
     HIGH = 800
     MIDIUM = 400
     LOW = 200
 
 
-class threshold():
+class threshold:
     HIGH = 0
     MEDIUM = 30
     LOW = 50
+
 
 async def Back_I2R():
     read = b'R\n'
@@ -55,6 +56,7 @@ write_characteristic = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
 devices_list = []
 devices_add = []
 device_count = 0
+count_delay = 0
 count = 0
 
 Found = False
@@ -68,6 +70,7 @@ payload_write = 35
 array_struct = []
 
 #####Controling Arrays #######
+
 array_struct_gen = []
 array_struct_mf = []
 array_struct_mb = []
@@ -84,14 +87,14 @@ array_struct_empty = []
 
 def search():
     searching = "Searching"
-    count = 0
+    count_delay =1
     for x in range(9):
         sleep(0.3)
-        count += 1
+        count_delay += 1
         searching = searching + "."
         sys.stdout.write('\r' + searching)
         sys.stdout.flush()
-        if count == 3:
+        if count_delay == 3:
             count = 0
             searching = "Searching"
 
@@ -112,6 +115,7 @@ async def scan():
         ins = input("Do you want to rescan? [y/n]")
         if ins in InputsYes:
             await scan()
+            return
 
         elif ins in InputsNo:
             print("Exiting")
@@ -136,13 +140,12 @@ async def scan():
         print("Choose a device to connect or type 'No' to exit ")
         await connect()
 
-
     elif device_count > 1:
         print()
         print(device_count, "Devices found ")
         print("| # | Name  |    Mac-Address     |")
         for i in range(device_count):
-            print("|", i+1, "|", str(devices_list[i][0:5]), "| ", devices_list[i][6:25], "|")
+            print("|", i + 1, "|", str(devices_list[i][0:5]), "| ", devices_list[i][6:25], "|")
         print("Choose a device to connect")
         await connect()
 
@@ -177,7 +180,7 @@ async def who_func():
     global Firmware
     global Hardware
     if BleakClient.is_connected:
-        print("Client name" , client)
+        print("Client name", client)
         try:
             await client.write_gatt_char(write_characteristic, who_msg)
             sleep(0.3)
@@ -480,16 +483,16 @@ async def move_right(speed: Union[speed, int]):
 
 
 async def move_left(speed: Union[speed, int, None]):
-        await empty_array()
-        array_struct[57] = '0x44'
-        array_struct[58] = (hex(0 & 0x00FF))
-        array_struct[59] = (hex((0 & 0xFF00) >> 8))
-        array_struct[60] = (hex(0 & 0xff00 >> 8))
+    await empty_array()
+    array_struct[57] = '0x44'
+    array_struct[58] = (hex(0 & 0x00FF))
+    array_struct[59] = (hex((0 & 0xFF00) >> 8))
+    array_struct[60] = (hex(0 & 0xff00 >> 8))
 
-        array_struct[61] = (hex(0 & 0x00FF))
-        array_struct[62] = (hex((0 & 0xFF00) >> 8))
-        array_struct[63] = (hex(speed & 0xff00 >> 8))
-        await payload_maker()
+    array_struct[61] = (hex(0 & 0x00FF))
+    array_struct[62] = (hex((0 & 0xFF00) >> 8))
+    array_struct[63] = (hex(speed & 0xff00 >> 8))
+    await payload_maker()
 
 
 async def stop_movement():
@@ -504,6 +507,7 @@ async def stop_movement():
     array_struct[63] = (hex(0 & 0xff00 >> 8))
     await payload_maker()
 
+
 ##################### Live Data #######################
 
 
@@ -512,15 +516,15 @@ async def Front_Left_IR(thhold: Union[int, threshold]):
     global count
     if count == 0:
         print("Front Left IR Active ")
-        count=1
+        count = 1
     sleep(0.2)
     await client.write_gatt_char(write_characteristic, read)
     sleep(0.05)
     data = await client.read_gatt_char(read_characteristic)
     Left_IR_Sensor = data[10]
-    if thhold== None:
+    if thhold is None:
         Left_IR_Sensor = data[10]
-    elif thhold== threshold.HIGH:
+    elif thhold == threshold.HIGH:
         Left_IR_Sensor = data[10]
     elif thhold == threshold.MEDIUM:
         Left_IR_Sensor = data[10] - threshold.MEDIUM
@@ -542,9 +546,9 @@ async def Front_Right_IR(thhold: Union[int, threshold]):
     sleep(0.05)
     data = await client.read_gatt_char(read_characteristic)
     Left_IR_Sensor = data[11]
-    if thhold== None:
+    if thhold == None:
         Left_IR_Sensor = data[11]
-    elif thhold== threshold.HIGH:
+    elif thhold == threshold.HIGH:
         Left_IR_Sensor = data[11]
     elif thhold == threshold.MEDIUM:
         Left_IR_Sensor = data[11] - threshold.MEDIUM
@@ -566,9 +570,9 @@ async def Back_IR(thhold: Union[int, threshold]):
     sleep(0.05)
     data = await client.read_gatt_char(read_characteristic)
     Left_IR_Sensor = data[9]
-    if thhold== None:
+    if thhold is None:
         Left_IR_Sensor = data[9]
-    elif thhold== threshold.HIGH:
+    elif thhold == threshold.HIGH:
         Left_IR_Sensor = data[9]
     elif thhold == threshold.MEDIUM:
         Left_IR_Sensor = data[9] - threshold.MEDIUM
@@ -578,6 +582,7 @@ async def Back_IR(thhold: Union[int, threshold]):
         Left_IR_Sensor = data[9] - thhold
 
     return Left_IR_Sensor
+
 
 async def Ultrasonic_sense():
     read = b'R\n'
@@ -590,13 +595,13 @@ async def Ultrasonic_sense():
     sleep(0.05)
     data = await client.read_gatt_char(read_characteristic)
     Left_IR_Sensor = data[30]
-    value_conversion = ((Left_IR_Sensor)/(240))*20
-    return value_conversion
+    value_conversion = (Left_IR_Sensor / 240) * 20
+    return floor(value_conversion)
 
 
 async def Left_Color_sense():
     read = b'R\n'
-    global count #15-16-17
+    global count  # 15-16-17
     if count == 0:
         print("Color sensor is Active ")
         count = 1
@@ -604,15 +609,15 @@ async def Left_Color_sense():
     await client.write_gatt_char(write_characteristic, read)
     sleep(0.05)
     data = await client.read_gatt_char(read_characteristic)
-    Red_comp = data[15] #255
+    Red_comp = data[15]
     Green_comp = data[16]
     Blue_Comp = data[17]
-    if Red_comp>=235 and Green_comp<=100 and Blue_Comp<=100:
-        return [255,0,0]
-    elif Red_comp<=100 and Green_comp>=235 and Blue_Comp<=100:
-        return [0,255,0]
-    elif Red_comp<=100 and Green_comp<=100 and Blue_Comp>=255:
-        return [0,0,255]
+    if Red_comp >= 235 and Green_comp <= 100 and Blue_Comp <= 100:
+        return [255, 0, 0]
+    elif Red_comp <= 100 and Green_comp >= 235 and Blue_Comp <= 100:
+        return [0, 255, 0]
+    elif Red_comp <= 100 and Green_comp <= 100 and Blue_Comp >= 255:
+        return [0, 0, 255]
     else:
         pass
 
