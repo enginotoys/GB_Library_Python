@@ -1,27 +1,52 @@
+from os import environ
+environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
+from typing import Union
 import sys
+from math import floor
 import asyncio
-import time
-import keyboard
-import ast
-from enum import Enum
+import pygame
 from time import sleep
 from bleak import BleakClient
 from bleak import discover
 
 
-# from aioconsole import ainput
-
-class speed(Enum):
-
-    @staticmethod
-    def value(**kwargs):
-        Fast = 100
-        Medium = 80
-        Slow = 60
+class speed():
+    fast = 100
+    medium = 80
+    slow = 70
 
 
 class color():
-        RED  = [255, 0, 0]
+    RED = [255, 0, 0]
+    GREEN = [0, 255, 0]
+    BLUE = [0, 0, 255]
+    PURPLE = [128, 0, 128]
+    PINK = [255, 0, 255]
+    ORANGE = [255, 165, 0]
+    YELLOW = [255, 255, 0]
+
+
+class frequency():
+    HIGH = 800
+    MIDIUM = 400
+    LOW = 200
+
+
+class threshold():
+    HIGH = 0
+    MEDIUM = 30
+    LOW = 50
+
+async def Back_I2R():
+    read = b'R\n'
+    sleep(0.2)
+    await client.write_gatt_char(write_characteristic, read)
+    sleep(0.05)
+    data = await client.read_gatt_char(read_characteristic)
+    print(data[30],
+          data[31])  # 30 -31 Ultra sound
+
+    # return Back_IR_Sensor
 
 
 read_characteristic = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
@@ -30,17 +55,31 @@ write_characteristic = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
 devices_list = []
 devices_add = []
 device_count = 0
+count = 0
+
 Found = False
-InputsYes = ['Y', 'yes' , 'YES', 'y', 'Yes']
-InputsNo = ['n', 'N' , 'No' , 'NO', 'no']
-# InputY = False
-# InputN = False
+InputsYes = ['Y', 'yes', 'YES', 'y', 'Yes']
+InputsNo = ['n', 'N', 'No', 'NO', 'no']
 Firmware = 0
 Hardware = 0
 
 connected = False
 payload_write = 35
 array_struct = []
+
+#####Controling Arrays #######
+array_struct_gen = []
+array_struct_mf = []
+array_struct_mb = []
+array_struct_mr = []
+array_struct_ml = []
+array_struct_empty = []
+
+
+##############################
+
+
+########Live Data Arrays #####
 
 
 def search():
@@ -59,12 +98,8 @@ def search():
 
 async def scan():
     global devices
-    global InputN
-    global InputY
     global device_count
     device_count = 0
-    InputY = False
-    InputN = False
     search()
     devices = await discover()
     for i, device in enumerate(devices):
@@ -75,51 +110,63 @@ async def scan():
     if device_count == 0:
         print('No devices found')
         ins = input("Do you want to rescan? [y/n]")
-        if(ins in InputsYes or InputY):
+        if ins in InputsYes:
             await scan()
 
-        elif (ins in InputsNo or InputN):
+        elif ins in InputsNo:
             print("Exiting")
             quit()
         else:
             ins = input("Invalid Input Enter again:")
             while ins not in InputsYes or ins not in InputsNo:
                 ins = input("Invalid input Enter again")
-                if (ins in InputsYes):
-                    InputY = True
+                if ins in InputsYes:
                     await scan()
                     break
-                elif(ins in InputsNo):
-                    InputN = True
+                elif ins in InputsNo:
                     break
                 else:
                     continue
 
     if device_count == 1:
-        print(device_count, "Device found ")
-        print('\n'.join(devices_list))
-        print("Choose a device to connect")
+        print()
+        print("1 Device found")
+        print("| # | Name  |    Mac-Address     |")
+        print("|", device_count, "|", devices_list[0][0:5], "| ", devices_list[0][6:25], "|")
+        print("Choose a device to connect or type 'No' to exit ")
         await connect()
-        Found = True
+
 
     elif device_count > 1:
+        print()
         print(device_count, "Devices found ")
-        print('\n'.join(devices_list))
+        print("| # | Name  |    Mac-Address     |")
+        for i in range(device_count):
+            print("|", i+1, "|", str(devices_list[i][0:5]), "| ", devices_list[i][6:25], "|")
         print("Choose a device to connect")
         await connect()
-        Found = True
 
 
 async def connect():
     global client
-    client = BleakClient(devices_add[(int(input()) - 1)])
+    while True:
+        try:
+            var = int(input())
+            if var > device_count:
+                print("Invalid input")
+            else:
+                break
+        except Exception:
+            print("Invalid input")
+
+    client = BleakClient(devices_add[var - 1])
     try:
         await client.connect()
         device_add = client.address
         if client.is_connected:
             print("Connection was successful")
             await who_func()
-            return True
+
     except Exception as e:
         print("Device failed to connect")
 
@@ -130,22 +177,18 @@ async def who_func():
     global Firmware
     global Hardware
     if BleakClient.is_connected:
-        print(client)
+        print("Client name" , client)
         try:
             await client.write_gatt_char(write_characteristic, who_msg)
-            time.sleep(0.3)
+            sleep(0.3)
             who_im_i = await client.read_gatt_char(read_characteristic)
             Firmware = who_im_i[3]
             Hardware = who_im_i[4]
-        except Exception:
+        except Exception:  # Exception is only caused by NameError or Index out of range
             print("Device failed to configure")
-
-    # Make sure this runs until is confirmed
 
 
 async def empty_array():  # This function builds the start empty array for Ginobot
-    # Bug! When a scan fails , the array build function still runs, which means the who func in the array build will fail
-    # Make sure that the exception is in a while Loop that ensures connection and gets Firm , and Hardware version
 
     array_struct.append(hex(ord('W')))
     array_struct.append(hex(ord(':')))
@@ -191,11 +234,169 @@ async def payload_maker():
         array_struct[i] = int(str(array_struct[i]), base=16)
 
     await client.write_gatt_char(write_characteristic, bytes(array_struct))
-    print(array_struct)
-    print('Here')
     array_struct.clear()
 
-async def Front_Lights(red=None, green=0, blue=0):
+
+async def payload_gen():
+    array_struct_gen.append(hex(ord('W')))
+    array_struct_gen.append(hex(ord(':')))
+
+    array_struct_gen.append(hex(ord('0'))), array_struct_gen.append(hex(ord('0'))), array_struct_gen.append(hex(ord('8')))
+    array_struct_gen.append(hex(ord('0'))), array_struct_gen.append(hex(ord('\n')))
+
+    for i in range(7, 32):
+        array_struct_gen.append(hex(ord(' ')))
+
+    array_struct_gen.append(hex(ord('[')))
+    array_struct_gen.append(hex(ord('[')))
+    array_struct_gen.append(hex(ord('[')))
+
+    array_struct_gen.append(Firmware)  # pos 35
+    array_struct_gen.append(Hardware)  # pos 36
+
+    array_struct_gen.append(hex(int(payload_write & 0x00FF)))
+    array_struct_gen.append(hex(int(payload_write & 0xFF00) >> 8))
+
+    array_struct_gen.append(hex(ord('W')))
+    array_struct_gen.append(hex(0))  # pos 40
+
+    for i in range(36):
+        array_struct_gen.append(hex(0))
+
+    checksummf = 0
+    checksummb = 0
+    checksummr = 0
+    checksumml = 0
+
+    array_struct_mf.extend(array_struct_gen)
+    array_struct_ml.extend(array_struct_gen)
+    array_struct_mr.extend(array_struct_gen)
+    array_struct_mb.extend(array_struct_gen)
+    ############################################
+    array_struct_mf[57] = '0x44'
+    array_struct_mf[58] = (hex(0 & 0x00FF))
+    array_struct_mf[59] = (hex((0 & 0xFF00) >> 8))
+    array_struct_mf[60] = (hex(100 & 0xff00 >> 8))
+
+    array_struct_mf[61] = (hex(0 & 0x00FF))
+    array_struct_mf[62] = (hex((0 & 0xFF00) >> 8))
+    array_struct_mf[63] = (hex(100 & 0xff00 >> 8))
+    ############################################
+
+    array_struct_mr[57] = '0x44'
+    array_struct_mr[58] = (hex(0 & 0x00FF))
+    array_struct_mr[59] = (hex((0 & 0xFF00) >> 8))
+    array_struct_mr[60] = (hex(100 & 0xff00 >> 8))
+
+    array_struct_mr[61] = (hex(0 & 0x00FF))
+    array_struct_mr[62] = (hex((0 & 0xFF00) >> 8))
+    array_struct_mr[63] = (hex(-100 & 0xff00 >> 8))
+
+    ############################################
+    array_struct_ml[57] = '0x44'
+    array_struct_ml[58] = (hex(0 & 0x00FF))
+    array_struct_ml[59] = (hex((0 & 0xFF00) >> 8))
+    array_struct_ml[60] = (hex(-100 & 0xff00 >> 8))
+
+    array_struct_ml[61] = (hex(0 & 0x00FF))
+    array_struct_ml[62] = (hex((0 & 0xFF00) >> 8))
+    array_struct_ml[63] = (hex(100 & 0xff00 >> 8))
+
+    ############################################
+    array_struct_mb[57] = '0x44'
+    array_struct_mb[58] = (hex(0 & 0x00FF))
+    array_struct_mb[59] = (hex((0 & 0xFF00) >> 8))
+    array_struct_mb[60] = (hex(-100 & 0xff00 >> 8))
+
+    array_struct_mb[61] = (hex(0 & 0x00FF))
+    array_struct_mb[62] = (hex((0 & 0xFF00) >> 8))
+    array_struct_mb[63] = (hex(-100 & 0xff00 >> 8))
+    ############################################
+    for i in range(payload_write):
+        checksummf += int(array_struct_mf[i + 40], 16)
+        checksummr += int(array_struct_mr[i + 40], 16)
+        checksumml += int(array_struct_ml[i + 40], 16)
+        checksummb += int(array_struct_mb[i + 40], 16)
+
+    array_struct_mf.append(hex(int(checksummf) & 0x000000FF))
+    array_struct_mf.append(hex((int(checksummf) & 0x0000FF00) >> 8))
+
+    array_struct_mf.append(hex(ord(']')))
+    array_struct_mf.append(hex(ord(']')))
+    array_struct_mf.append(hex(ord(']')))
+    #########################################################
+    array_struct_mr.append(hex(int(checksummr) & 0x000000FF))
+    array_struct_mr.append(hex((int(checksummr) & 0x0000FF00) >> 8))
+
+    array_struct_mr.append(hex(ord(']')))
+    array_struct_mr.append(hex(ord(']')))
+    array_struct_mr.append(hex(ord(']')))
+    ###############################################
+    array_struct_ml.append(hex(int(checksumml & 0x000000FF)))
+    array_struct_ml.append(hex((int(checksumml) & 0x0000FF00) >> 8))
+
+    array_struct_ml.append(hex(ord(']')))
+    array_struct_ml.append(hex(ord(']')))
+    array_struct_ml.append(hex(ord(']')))
+    ################################################
+    array_struct_mb.append(hex(int(checksummb) & 0x000000FF))
+    array_struct_mb.append(hex((int(checksummb) & 0x0000FF00) >> 8))
+
+    array_struct_mb.append(hex(ord(']')))
+    array_struct_mb.append(hex(ord(']')))
+    array_struct_mb.append(hex(ord(']')))
+
+    for i in range(len(array_struct_mf)):
+        array_struct_mf[i] = int(str(array_struct_mf[i]), base=16)
+        array_struct_mr[i] = int(str(array_struct_mr[i]), base=16)
+        array_struct_ml[i] = int(str(array_struct_ml[i]), base=16)
+        array_struct_mb[i] = int(str(array_struct_mb[i]), base=16)
+
+
+async def payload_empty():
+    array_struct_empty.append(hex(ord('W')))
+    array_struct_empty.append(hex(ord(':')))
+
+    array_struct_empty.append(hex(ord('0'))), array_struct_empty.append(hex(ord('0'))), array_struct_empty.append(hex(ord('8')))
+    array_struct_empty.append(hex(ord('0'))), array_struct_empty.append(hex(ord('\n')))
+
+    for i in range(7, 32):
+        array_struct_empty.append(hex(ord(' ')))
+
+    array_struct_empty.append(hex(ord('[')))
+    array_struct_empty.append(hex(ord('[')))
+    array_struct_empty.append(hex(ord('[')))
+
+    array_struct_empty.append(Firmware)  # pos 35
+    array_struct_empty.append(Hardware)  # pos 36
+
+    array_struct_empty.append(hex(int(payload_write & 0x00FF)))
+    array_struct_empty.append(hex(int(payload_write & 0xFF00) >> 8))
+
+    array_struct_empty.append(hex(ord('W')))
+    array_struct_empty.append(hex(0))  # pos 40
+
+    for i in range(36):
+        array_struct_empty.append(hex(0))
+    checksum = 0
+    for i in range(payload_write):
+        checksum += int(array_struct_empty[i + 40], 16)
+
+    array_struct_empty.append(hex(int(checksum) & 0x000000FF))
+    array_struct_empty.append(hex((int(checksum) & 0x0000FF00) >> 8))
+
+    array_struct_empty.append(hex(ord(']')))
+    array_struct_empty.append(hex(ord(']')))
+    array_struct_empty.append(hex(ord(']')))
+
+    print(array_struct_empty)
+    for i in range(len(array_struct_empty)):
+        array_struct_empty[i] = int(str(array_struct_empty[i]), base=16)
+
+
+####################### Functionality ##########################
+
+async def Front_Lights(red: Union[int, color], green=0, blue=0):
     print("Front Lights input (Red , Green , Blue)")
     await empty_array()
 
@@ -211,60 +412,25 @@ async def Front_Lights(red=None, green=0, blue=0):
     await payload_maker()
 
 
-async def Back_Lights(*argument):  # Look for multiple arguments in function
-    print('Back Lights input (Red , Green , Blue)')
-    col_arr = []
-    await empty_array()
-    col_arr.append(0)
-    col_arr.append(0)
-    col_arr.append(0)
-
-    for count, i in enumerate(argument):
-        col_arr[count] = i
-        print(i)
-    array_struct[46] = hex(col_arr[0])
-    array_struct[47] = hex(col_arr[1])
-    array_struct[48] = hex(col_arr[2])
-
-    await payload_maker()
-
-
-async def Front_Lights2(red, green, blue):
+async def Back_Lights(red: Union[int, color], green=0, blue=0):
     print("Front Lights input (Red , Green , Blue)")
     await empty_array()
-    print("Red=", end=" ")
-    red = int(input())
-    print("Green=", end=" ")
-    green = int(input())
-    print("Blue=", end=" ")
-    blue = int(input())
-    array_struct[49] = hex(red)
-    array_struct[50] = hex(green)
-    array_struct[51] = hex(blue)
+
+    if isinstance(red, list):
+        array_struct[46] = hex(red[0])
+        array_struct[47] = hex(red[1])
+        array_struct[48] = hex(red[2])
+    else:
+        array_struct[46] = hex(red)
+        array_struct[47] = hex(green)
+        array_struct[48] = hex(blue)
+
     await payload_maker()
 
 
-async def Back_Lights2():
-    print('Back Lights input (Red , Green , Blue)')
-
-    print("Red=", end=" ")
-    red = int(input())
-    print("Green=", end=" ")
-    green = int(input())
-    print("Blue=", end=" ")
-    blue = int(input())
-    await empty_array()  # This probably shouldnt be here
-    # array_struct[36] = Firmware
-    # array_struct[37] = Hardware
-    array_struct[46] = hex(red)
-    array_struct[47] = hex(green)
-    array_struct[48] = hex(blue)
-    await payload_maker()
-
-
-async def Buzzer(freq):
+async def Buzzer(freq: Union[frequency, int]):
     # 53 , 54
-    print("Enter buzzer frequancy")
+    # (From 0 -10000)
     await empty_array()
     array_struct[53] = (hex(int(freq) & 0x00FF))
     array_struct[54] = (hex((int(freq) & 0x0000FF00) >> 8))  # Wrong bit shifting seems to work
@@ -273,7 +439,7 @@ async def Buzzer(freq):
     await payload_maker()
 
 
-async def move_forward(speed):
+async def move_forward(speed: Union[speed, int]):
     await empty_array()
     array_struct[57] = '0x44'
     array_struct[58] = (hex(0 & 0x00FF))
@@ -287,7 +453,7 @@ async def move_forward(speed):
     # 57 - 63
 
 
-async def move_backwards(speed):
+async def move_backwards(speed: Union[speed, int]):
     await empty_array()
     array_struct[57] = '0x44'
     array_struct[58] = (hex(0 & 0x00FF))
@@ -300,7 +466,7 @@ async def move_backwards(speed):
     await payload_maker()
 
 
-async def move_right(speed):
+async def move_right(speed: Union[speed, int]):
     await empty_array()
     array_struct[57] = '0x44'
     array_struct[58] = (hex(0 & 0x00FF))
@@ -313,65 +479,20 @@ async def move_right(speed):
     await payload_maker()
 
 
-async def move_left(speed):
-    await empty_array()
-    array_struct[57] = '0x44'
-    array_struct[58] = (hex(0 & 0x00FF))
-    array_struct[59] = (hex((0 & 0xFF00) >> 8))
-    array_struct[60] = (hex(0 & 0xff00 >> 8))
+async def move_left(speed: Union[speed, int, None]):
+        await empty_array()
+        array_struct[57] = '0x44'
+        array_struct[58] = (hex(0 & 0x00FF))
+        array_struct[59] = (hex((0 & 0xFF00) >> 8))
+        array_struct[60] = (hex(0 & 0xff00 >> 8))
 
-    array_struct[61] = (hex(0 & 0x00FF))
-    array_struct[62] = (hex((0 & 0xFF00) >> 8))
-    array_struct[63] = (hex(speed & 0xff00 >> 8))
-    await payload_maker()
-
-
-########################## TESTS #############################
-async def Buzzer2():
-    # 53 , 54
-    print("Enter buzzer frequancy")
-    freq = int(input())
-    await empty_array()
-    array_struct[53] = (hex(int(freq) & 0x00FF))
-    array_struct[54] = (hex((int(freq) & 0x0000FF00) >> 8))  # Wrong bit shifting seems to work
-    print(array_struct[53])
-    print((array_struct[54]))
-    await payload_maker()
+        array_struct[61] = (hex(0 & 0x00FF))
+        array_struct[62] = (hex((0 & 0xFF00) >> 8))
+        array_struct[63] = (hex(speed & 0xff00 >> 8))
+        await payload_maker()
 
 
-async def move_forward2():
-    # power = int(input())
-    await empty_array()
-    speed = 100
-    array_struct[57] = '0x44'
-    array_struct[58] = (hex(0 & 0x00FF))
-    array_struct[59] = (hex((0 & 0xFF00) >> 8))
-    array_struct[60] = (hex(speed & 0xff00 >> 8))
-
-    array_struct[61] = (hex(0 & 0x00FF))
-    array_struct[62] = (hex((0 & 0xFF00) >> 8))
-    array_struct[63] = (hex(speed & 0xff00 >> 8))
-    await payload_maker()
-    await empty_array()
-    time.sleep(0.1)
-    array_struct[57] = '0x44'
-    array_struct[58] = (hex(0 & 0x00FF))
-    array_struct[59] = (hex((0 & 0xFF00) >> 8))
-    array_struct[60] = (hex(0 & 0xff00 >> 8))
-
-    array_struct[61] = (hex(0 & 0x00FF))
-    array_struct[62] = (hex((0 & 0xFF00) >> 8))
-    array_struct[63] = (hex(0 & 0xff00 >> 8))
-    await payload_maker()
-
-
-async def move_forward3():
-    await move_forward(100)
-    await client.write_gatt_char(write_characteristic, bytes(array_struct))
-    array_struct.clear()
-
-
-async def stop():
+async def stop_movement():
     await empty_array()
     array_struct[57] = '0x44'
     array_struct[58] = (hex(0 & 0x00FF))
@@ -383,21 +504,188 @@ async def stop():
     array_struct[63] = (hex(0 & 0xff00 >> 8))
     await payload_maker()
 
-#
-# async def controller():
-#     val = True
-#     while val:
-#         if keyboard.is_pressed('w'):
-#             await move_forward3()
-#         else:
+##################### Live Data #######################
 
 
-# async def live_data():
-#     read = b'R\n'
-#     await BleakClient.write_gatt_char(write_characteristic, bytes(None))
-#     time.sleep(0.01)
-#     while True:
-#         data_set = await BleakClient.read_gatt_char(read_characteristic)
+async def Front_Left_IR(thhold: Union[int, threshold]):
+    read = b'R\n'
+    global count
+    if count == 0:
+        print("Front Left IR Active ")
+        count=1
+    sleep(0.2)
+    await client.write_gatt_char(write_characteristic, read)
+    sleep(0.05)
+    data = await client.read_gatt_char(read_characteristic)
+    Left_IR_Sensor = data[10]
+    if thhold== None:
+        Left_IR_Sensor = data[10]
+    elif thhold== threshold.HIGH:
+        Left_IR_Sensor = data[10]
+    elif thhold == threshold.MEDIUM:
+        Left_IR_Sensor = data[10] - threshold.MEDIUM
+    elif thhold == threshold.LOW:
+        Left_IR_Sensor = data[10] - threshold.LOW
+    else:
+        Left_IR_Sensor = data[10] - thhold
+    return Left_IR_Sensor
 
-# data_set = int(''.join(map(hex, data_set)).replace('0x', ''), 16)
-# print(data_set)
+
+async def Front_Right_IR(thhold: Union[int, threshold]):
+    read = b'R\n'
+    global count
+    if count == 0:
+        print("Front Right IR Active ")
+        count = 1
+    sleep(0.2)
+    await client.write_gatt_char(write_characteristic, read)
+    sleep(0.05)
+    data = await client.read_gatt_char(read_characteristic)
+    Left_IR_Sensor = data[11]
+    if thhold== None:
+        Left_IR_Sensor = data[11]
+    elif thhold== threshold.HIGH:
+        Left_IR_Sensor = data[11]
+    elif thhold == threshold.MEDIUM:
+        Left_IR_Sensor = data[11] - threshold.MEDIUM
+    elif thhold == threshold.LOW:
+        Left_IR_Sensor = data[11] - threshold.LOW
+    else:
+        Left_IR_Sensor = data[11] - thhold
+    return Left_IR_Sensor
+
+
+async def Back_IR(thhold: Union[int, threshold]):
+    read = b'R\n'
+    global count
+    if count == 0:
+        print("Front Right IR Active ")
+        count = 1
+    sleep(0.2)
+    await client.write_gatt_char(write_characteristic, read)
+    sleep(0.05)
+    data = await client.read_gatt_char(read_characteristic)
+    Left_IR_Sensor = data[9]
+    if thhold== None:
+        Left_IR_Sensor = data[9]
+    elif thhold== threshold.HIGH:
+        Left_IR_Sensor = data[9]
+    elif thhold == threshold.MEDIUM:
+        Left_IR_Sensor = data[9] - threshold.MEDIUM
+    elif thhold == threshold.LOW:
+        Left_IR_Sensor = data[9] - threshold.LOW
+    else:
+        Left_IR_Sensor = data[9] - thhold
+
+    return Left_IR_Sensor
+
+async def Ultrasonic_sense():
+    read = b'R\n'
+    global count
+    if count == 0:
+        print("Ultrasonic sensor is Active ")
+        count = 1
+    sleep(0.2)
+    await client.write_gatt_char(write_characteristic, read)
+    sleep(0.05)
+    data = await client.read_gatt_char(read_characteristic)
+    Left_IR_Sensor = data[30]
+    value_conversion = ((Left_IR_Sensor)/(240))*20
+    return value_conversion
+
+
+async def Left_Color_sense():
+    read = b'R\n'
+    global count #15-16-17
+    if count == 0:
+        print("Color sensor is Active ")
+        count = 1
+    sleep(0.2)
+    await client.write_gatt_char(write_characteristic, read)
+    sleep(0.05)
+    data = await client.read_gatt_char(read_characteristic)
+    Red_comp = data[15] #255
+    Green_comp = data[16]
+    Blue_Comp = data[17]
+    if Red_comp>=235 and Green_comp<=100 and Blue_Comp<=100:
+        return [255,0,0]
+    elif Red_comp<=100 and Green_comp>=235 and Blue_Comp<=100:
+        return [0,255,0]
+    elif Red_comp<=100 and Green_comp<=100 and Blue_Comp>=255:
+        return [0,0,255]
+    else:
+        pass
+
+
+async def Right_Color_sense():
+    read = b'R\n'
+    global count  # 15-16-17
+    if count == 0:
+        print("Color sensor is Active ")
+        count = 1
+    sleep(0.2)
+    await client.write_gatt_char(write_characteristic, read)
+    sleep(0.05)
+    data = await client.read_gatt_char(read_characteristic)
+    Red_comp = data[15]  # 255
+    Green_comp = data[16]
+    Blue_Comp = data[17]
+    if Red_comp >= 235 and Green_comp <= 100 and Blue_Comp <= 100:
+        return [255, 0, 0]
+    elif Red_comp <= 100 and Green_comp >= 235 and Blue_Comp <= 100:
+        return [0, 255, 0]
+    elif Red_comp <= 100 and Green_comp <= 100 and Blue_Comp >= 255:
+        return [0, 0, 255]
+    else:
+        pass
+
+
+async def controller():
+    await payload_empty()
+    await payload_gen()
+    window = pygame.display.set_mode((500, 500))
+    window1 = pygame.Surface((500, 500), pygame.SRCALPHA)
+
+    clock = pygame.time.Clock()
+    window_rect = window1.get_rect(midleft=(20, window.get_height() // 2))
+    run = True
+    while run:
+        clock.tick(60)
+        # current_time = pygame.time.get_ticks()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+
+            state = pygame.key.get_pressed()
+
+            if state[pygame.K_UP] == 1:
+                pygame.draw.polygon(surface=window1, color=(255, 0, 0), points=[(150, 150), (300, 150), (225, 40)])
+                await client.write_gatt_char(write_characteristic, bytes(array_struct_mf))
+
+            if state[pygame.K_LEFT] == 1:
+                pygame.draw.polygon(surface=window1, color=(255, 0, 0), points=[(100, 170), (100, 310), (10, 240)])
+                await client.write_gatt_char(write_characteristic, bytes(array_struct_ml))
+
+            if state[pygame.K_DOWN] == 1:
+                pygame.draw.polygon(surface=window1, color=(255, 0, 0), points=[(150, 350), (300, 350), (225, 440)])
+                await client.write_gatt_char(write_characteristic, bytes(array_struct_mb))
+
+            if state[pygame.K_RIGHT] == 1:
+                pygame.draw.polygon(surface=window1, color=(255, 0, 0), points=[(350, 170), (350, 310), (450, 240)])
+                await client.write_gatt_char(write_characteristic, bytes(array_struct_mr))
+
+            if not state[pygame.K_LEFT] and not state[pygame.K_RIGHT] and not state[pygame.K_UP] and not state[pygame.K_DOWN]:
+                pygame.draw.rect(window1, (224, 192, 160), (100, 230, 260, 20))
+                pygame.draw.rect(window1, (224, 192, 160), (215, 110, 20, 250))
+
+                pygame.draw.polygon(surface=window1, color=(224, 192, 160), points=[(150, 150), (300, 150), (225, 40)])
+                pygame.draw.polygon(surface=window1, color=(224, 192, 160), points=[(150, 350), (300, 350), (225, 440)])
+                pygame.draw.polygon(surface=window1, color=(224, 192, 160), points=[(100, 170), (100, 310), (10, 240)])
+                pygame.draw.polygon(surface=window1, color=(224, 192, 160), points=[(350, 170), (350, 310), (450, 240)])
+                await client.write_gatt_char(write_characteristic, bytes(array_struct_empty))
+        window.fill((224, 192, 160))
+        window.blit(window1, window_rect)
+        pygame.display.flip()
+    pygame.quit()
+    exit()
