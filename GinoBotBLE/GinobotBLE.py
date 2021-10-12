@@ -7,7 +7,7 @@ from bleak import discover
 
 
 environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
-from pygame import pygame
+import pygame
 
 
 class speed:  # Speed standard values
@@ -392,7 +392,6 @@ async def payload_empty():
 ####################### Functionality ##########################
 
 async def Front_Lights(red: Union[int, color], green=0, blue=0):
-    print("Front Lights input (Red , Green , Blue)")
     await empty_array()
 
     if isinstance(red, list):
@@ -408,7 +407,6 @@ async def Front_Lights(red: Union[int, color], green=0, blue=0):
 
 
 async def Back_Lights(red: Union[int, color], green=0, blue=0):
-    print("Front Lights input (Red , Green , Blue)")
     await empty_array()
 
     if isinstance(red, list):
