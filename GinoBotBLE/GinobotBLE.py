@@ -1,6 +1,8 @@
 from os import environ
 from typing import Union
 import sys
+import asyncio
+import ctypes
 from math import floor
 from time import sleep
 from bleak import BleakClient
@@ -10,13 +12,13 @@ environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 import pygame
 
 
-class speed:
-    fast = 100
-    medium = 80
-    slow = 70
+class speed:  # Speed standard values
+    fast: int = 100
+    medium: int = 80
+    slow: int = 70
 
 
-class color:
+class color:  # Color standard values
     RED = [255, 0, 0]
     GREEN = [0, 255, 0]
     BLUE = [0, 0, 255]
@@ -26,33 +28,26 @@ class color:
     YELLOW = [255, 255, 0]
 
 
-class frequency:
-    HIGH = 800
-    MIDIUM = 400
-    LOW = 200
+class frequency:  # Frequency standard value
+    HIGH: int = 800
+    MEDIUM: int = 400
+    LOW: int = 200
 
 
-class threshold:
+class threshold:  # Threshold standard values
     HIGH = 0
     MEDIUM = 30
     LOW = 50
 
 
-async def Back_I2R():
-    read = b'R\n'
-    sleep(0.2)
-    await client.write_gatt_char(write_characteristic, read)
-    sleep(0.05)
-    data = await client.read_gatt_char(read_characteristic)
-    print(data[30],
-          data[31])  # 30 -31 Ultra sound
-
-    # return Back_IR_Sensor
-
+### Characteristics ###
 
 read_characteristic = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
 write_characteristic = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
 
+######################
+
+### Vars and Lists ###
 devices_list = []
 devices_add = []
 device_count = 0
@@ -69,6 +64,8 @@ connected = False
 payload_write = 35
 array_struct = []
 
+###################
+
 #####Controling Arrays #######
 
 array_struct_gen = []
@@ -78,16 +75,14 @@ array_struct_mr = []
 array_struct_ml = []
 array_struct_empty = []
 
-
 ##############################
-
 
 ########Live Data Arrays #####
 
 
 def search():
     searching = "Searching"
-    count_delay =1
+    count_delay = 1
     for x in range(9):
         sleep(0.3)
         count_delay += 1
@@ -95,22 +90,22 @@ def search():
         sys.stdout.write('\r' + searching)
         sys.stdout.flush()
         if count_delay == 3:
-            count = 0
+            count_delay = 0
             searching = "Searching"
 
 
-async def scan():
+async def scan(): #Scan for devices
     global devices
     global device_count
     device_count = 0
     search()
     devices = await discover()
-    for i, device in enumerate(devices):
+    for i, device in enumerate(devices): # Enumarate and assign
         if device.name == 'ESP32':
-            devices_list.append(device.name + " " + device.address)
+            devices_list.append(device.name + " " + device.address) # Create a breakable string
             devices_add.append(device.address)
             device_count += 1
-    if device_count == 0:
+    if device_count == 0: # Check for devices again
         print('No devices found')
         ins = input("Do you want to rescan? [y/n]")
         if ins in InputsYes:
@@ -132,12 +127,13 @@ async def scan():
                 else:
                     continue
 
+
     if device_count == 1:
         print()
         print("1 Device found")
         print("| # | Name  |    Mac-Address     |")
         print("|", device_count, "|", devices_list[0][0:5], "| ", devices_list[0][6:25], "|")
-        print("Choose a device to connect or type 'No' to exit ")
+        print("Choose a device to connect")
         await connect()
 
     elif device_count > 1:
@@ -152,7 +148,7 @@ async def scan():
 
 async def connect():
     global client
-    while True:
+    while True: # Exception for invalid input
         try:
             var = int(input())
             if var > device_count:
@@ -232,7 +228,6 @@ async def payload_maker():
     array_struct.append(hex(ord(']')))
     array_struct.append(hex(ord(']')))
 
-    print(array_struct)
     for i in range(len(array_struct)):
         array_struct[i] = int(str(array_struct[i]), base=16)
 
@@ -392,7 +387,6 @@ async def payload_empty():
     array_struct_empty.append(hex(ord(']')))
     array_struct_empty.append(hex(ord(']')))
 
-    print(array_struct_empty)
     for i in range(len(array_struct_empty)):
         array_struct_empty[i] = int(str(array_struct_empty[i]), base=16)
 
@@ -437,8 +431,6 @@ async def Buzzer(freq: Union[frequency, int]):
     await empty_array()
     array_struct[53] = (hex(int(freq) & 0x00FF))
     array_struct[54] = (hex((int(freq) & 0x0000FF00) >> 8))  # Wrong bit shifting seems to work
-    print(array_struct[53])
-    print((array_struct[54]))
     await payload_maker()
 
 
@@ -594,16 +586,16 @@ async def Ultrasonic_sense():
     await client.write_gatt_char(write_characteristic, read)
     sleep(0.05)
     data = await client.read_gatt_char(read_characteristic)
-    Left_IR_Sensor = data[30]
-    value_conversion = (Left_IR_Sensor / 240) * 20
-    return floor(value_conversion)
+    Ultrasonic_Sensor = data[30] +data[31]*256
+    value_conversion = (Ultrasonic_Sensor) /10
+    return value_conversion
 
 
 async def Left_Color_sense():
     read = b'R\n'
     global count  # 15-16-17
     if count == 0:
-        print("Color sensor is Active ")
+        print("Left color sensor is Active ")
         count = 1
     sleep(0.2)
     await client.write_gatt_char(write_characteristic, read)
@@ -626,7 +618,7 @@ async def Right_Color_sense():
     read = b'R\n'
     global count  # 15-16-17
     if count == 0:
-        print("Color sensor is Active ")
+        print("Right color sensor is Active ")
         count = 1
     sleep(0.2)
     await client.write_gatt_char(write_characteristic, read)
@@ -694,3 +686,4 @@ async def controller():
         pygame.display.flip()
     pygame.quit()
     exit()
+
