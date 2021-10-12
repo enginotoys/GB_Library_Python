@@ -1,15 +1,13 @@
 from os import environ
 from typing import Union
 import sys
-import asyncio
-import ctypes
-from math import floor
 from time import sleep
 from bleak import BleakClient
 from bleak import discover
 
+
 environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
-import pygame
+from pygame import pygame
 
 
 class speed:  # Speed standard values
