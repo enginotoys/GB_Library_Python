@@ -17,3 +17,4 @@ _here = pathlib.Path(__file__).parent
 # BleakUWPBridge
 sys.path.append(str(pathlib.Path(__file__).parent))
 clr.AddReference("BleakUWPBridge")
+clr.A
