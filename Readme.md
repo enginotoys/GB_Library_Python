@@ -13,7 +13,7 @@ Install Interpreter
 * If on the top of the Window there is not the latest version you have installed as interpreter  
 * Click on the Gear icon and click the 'Add' button Go to System Interpreter and click the three dots   
 * This should open your File manager.  
-* From there you have to navigate to C:\Users\ **YOUR NAME**\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Python 3.10   
+* From there you have to navigate to C:\Users\ **YOUR NAME** \AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Python 3.10   
 * Click on the Python file and that should be your interpreter   
 * If you still cannot find the Python interpreter press the Windows Key , search for Python , right click and click open file folder. Copy the path go back to the fourth dot , and repeat the steps but with the path you coppied.
 
