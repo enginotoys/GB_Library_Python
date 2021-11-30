@@ -2,7 +2,7 @@
 
 ---
 ## Introduction
-####This is the official Python Library for running GinoBot using the Bluetooth protocol from your computer or laptop device. The Library makes use of the Bleak Module and the Pygame Module to make for a nice use and control of the GinoBot Toy.
+#### This is the official Python Library for running GinoBot using the Bluetooth protocol from your computer or laptop device. The Library makes use of the Bleak Module and the Pygame Module to make for a nice use and control of the GinoBot Toy.
 
 
 
