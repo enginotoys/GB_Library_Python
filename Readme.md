@@ -32,6 +32,3 @@ Install Interpreter
 * To run the module just for scanning and connecting to your GinoBot, you have to click on the project tab on the left of the pycharm window open through GB_Library_Python-main->GinoBotBle->Library right click on the library file and click the run option
 * You should see a searching text appear! That means it's working!. 
 
-
-
-Hello
